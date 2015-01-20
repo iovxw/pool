@@ -25,7 +25,12 @@ func main() {
 
 	fmt.Println("Max Thread:", pool.GetMaxThread())
 	pool.Run()
+	fmt.Println(pool.Run())
+
 	time.Sleep(time.Second * 1)
-	pool.Exit()
+
+	fmt.Println("\nStop")
+	pool.Stop()
+	fmt.Println("\nAll done")
 }
 ```
