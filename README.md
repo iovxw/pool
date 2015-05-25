@@ -3,7 +3,7 @@
 [![Go Walker](https://img.shields.io/badge/Go%20Walker-API%20Documentation-green.svg?style=flat)](https://gowalker.org/github.com/Bluek404/pool)
 [![GoDoc](https://img.shields.io/badge/GoDoc-API%20Documentation-blue.svg?style=flat)](http://godoc.org/github.com/Bluek404/pool)
 
-goroutine执行完毕后，自动补充goroutine
+开启指定数量的 goroutine，并限制同时运行的 goroutine 数量
 
 # Example
 
@@ -18,19 +18,17 @@ import (
 )
 
 func main() {
-	pool := p.NewPool(10, func() {
-		time.Sleep(time.Millisecond * 100)
+	pool := p.NewPool(100, 10, func() {
+		time.Sleep(time.Second * 1)
 		fmt.Print(0)
 	})
 
-	fmt.Println("Max Thread:", pool.GetMaxThread())
 	pool.Run()
 	fmt.Println(pool.Run())
+	// Output:
+	// already running
 
-	time.Sleep(time.Second * 1)
-
-	fmt.Println("\nStop")
-	pool.Stop()
+	pool.Wait()
 	fmt.Println("\nAll done")
 }
 ```

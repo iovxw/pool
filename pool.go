@@ -8,76 +8,83 @@ var (
 	AlRunErr = errors.New("already running")
 )
 
-func NewPool(maxThread int, f func()) Pool {
+// 新建线程池
+// NewPool(总数量, 最大运行数量, 函数)
+// 总数量小于等于 -1 时，为无限，需要手动调用Stop()来停止
+func NewPool(max, maxThread int, f func()) Pool {
 	return Pool{
+		max:       max,
 		maxThread: maxThread,
-		done:      make(chan bool, maxThread),
-		allDone:   make(chan bool),
 		f:         f,
 	}
 }
 
 type Pool struct {
+	max       int
 	maxThread int
-	threadNum int
 	f         func()
 	stop      bool
 	lock      bool
+	n         chan bool
 	done      chan bool
-	allDone   chan bool
 }
 
 func (p *Pool) Run() error {
-	if !p.lock {
-		p.lock = true
-		p.stop = false
-		go func() {
-			// 开启预定数量线程
-			for i := 0; i < p.maxThread; i++ {
-				// 处理当预定数量线程还未开启完毕时
-				// 接受到的Stop信号
-				if !p.stop {
-					p.threadNum++
-					go p.run()
-				} else {
+	if p.lock {
+		return AlRunErr
+	}
+	p.lock = true
+
+	// 初始化值，防止上一次Run()产生影响
+	p.n = make(chan bool, p.maxThread)
+	p.done = make(chan bool, 1)
+	p.stop = false
+	go func() {
+		if p.max > 0 {
+			for i := 0; i < p.max; i++ {
+				if p.stop {
 					break
 				}
+				p.run()
 			}
-
-			// 保持线程数量
+			p.s()
+		} else {
 			for {
-				<-p.done
-				if !p.stop {
-					go p.run()
-				} else {
-					p.threadNum--
-					if p.threadNum == 0 {
-						p.allDone <- true
-						p.lock = false
-					}
+				if p.stop {
+					break
 				}
+				p.run()
 			}
-		}()
+		}
+	}()
 
-		return nil
-	}
-
-	return AlRunErr
+	return nil
 }
 
 func (p *Pool) run() {
-	p.f()
-	p.done <- true
+	p.n <- true
+	go func() {
+		p.f()
+		<-p.n
+	}()
 }
 
-// 获取设置的最大线程数
-func (p *Pool) GetMaxThread() int {
-	return p.maxThread
+func (p *Pool) s() {
+	p.stop = true
+	for i := 0; i < len(p.n); i++ {
+		p.n <- true
+	}
+	p.lock = false
+	p.done <- true
 }
 
 // 停止继续补充线程
 // 并等待已经开启的线程全部执行完毕
 func (p *Pool) Stop() {
-	p.stop = true
-	<-p.allDone
+	go p.s()
+}
+
+// 等待线程全部执行完毕
+func (p *Pool) Wait() {
+	<-p.done
 }
